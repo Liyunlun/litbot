@@ -38,6 +38,30 @@ def _input_list(prompt: str, hint: str = "comma-separated") -> list[str]:
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 
+def _input_int(prompt: str, default: int) -> int:
+    """Input an integer with validation."""
+    while True:
+        raw = input(f"{prompt} [{default}]: ").strip()
+        if not raw:
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            print(f"  ⚠ Please enter a valid integer.")
+
+
+def _input_float(prompt: str, default: float) -> float:
+    """Input a float with validation."""
+    while True:
+        raw = input(f"{prompt} [{default}]: ").strip()
+        if not raw:
+            return default
+        try:
+            return float(raw)
+        except ValueError:
+            print(f"  ⚠ Please enter a valid number.")
+
+
 def _yes_no(prompt: str, default: bool = False) -> bool:
     suffix = " [Y/n]" if default else " [y/N]"
     raw = input(prompt + suffix + ": ").strip().lower()
@@ -126,13 +150,13 @@ def run_setup(profile_path: Path | None = None) -> Profile:
     print("── Step 5/6: Preferences ──")
     print()
     language = _input("Push language", "zh")
-    max_papers = int(_input("Max papers per daily digest", "10"))
-    diversity = float(_input("Diversity ratio (0-1, portion reserved for exploratory papers)", "0.2"))
-    min_cite = int(_input("Minimum citation count to highlight", "10"))
+    max_papers = _input_int("Max papers per daily digest", 10)
+    diversity = _input_float("Diversity ratio (0-1, portion reserved for exploratory papers)", 0.2)
+    min_cite = _input_int("Minimum citation count to highlight", 10)
     print()
 
-    quiet_start = int(_input("Quiet hours start (0-23)", "22"))
-    quiet_end = int(_input("Quiet hours end (0-23)", "8"))
+    quiet_start = _input_int("Quiet hours start (0-23)", 22)
+    quiet_end = _input_int("Quiet hours end (0-23)", 8)
     print()
 
     # === Step 6: Feishu Configuration ===
@@ -176,10 +200,16 @@ def run_setup(profile_path: Path | None = None) -> Profile:
     print()
 
     if webhook:
-        # Save webhook to a separate env file
+        # Save webhook to env file (replace if already exists)
         env_path = path.parent / ".env"
-        with open(env_path, "a") as f:
-            f.write(f"\nLITBOT_FEISHU_WEBHOOK={webhook}\n")
+        existing_lines: list[str] = []
+        if env_path.exists():
+            existing_lines = [
+                line for line in env_path.read_text().splitlines()
+                if not line.startswith("LITBOT_FEISHU_WEBHOOK=")
+            ]
+        existing_lines.append(f"LITBOT_FEISHU_WEBHOOK={webhook}")
+        env_path.write_text("\n".join(existing_lines) + "\n")
         print(f"  Webhook saved to {env_path}")
 
     return profile

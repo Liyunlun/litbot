@@ -48,11 +48,11 @@ def paper_url(paper: PaperRecord) -> str:
 
 
 def _is_bootstrap_mode(conn: sqlite3.Connection, user_id: str = "default") -> bool:
-    """Check whether the user is still in bootstrap mode."""
+    """Check whether the user is still in bootstrap mode (< 5 saves)."""
     row = conn.execute(
-        "SELECT mode FROM bootstrap_state WHERE user_id = ?", (user_id,)
+        "SELECT mode, save_count FROM bootstrap_state WHERE user_id = ?", (user_id,)
     ).fetchone()
-    return row is not None and row[0] == "active"
+    return row is not None and row[0] == "active" and (row[1] or 0) < 5
 
 
 # ---------------------------------------------------------------------------
@@ -315,15 +315,24 @@ def build_health_card(report_text: str) -> dict:
 def verify_signature(
     timestamp: str, nonce: str, body: str, encrypt_key: str
 ) -> str:
-    """Compute the Feishu webhook verification signature.
+    """Compute the Feishu webhook verification signature using HMAC-SHA256.
 
-    Formula: SHA256(timestamp + nonce + encrypt_key + body)
+    Formula: HMAC-SHA256(key=encrypt_key, msg=timestamp + nonce + body)
 
     Returns:
-        Hex-encoded SHA-256 digest.
+        Hex-encoded HMAC-SHA256 digest.
     """
-    payload = (timestamp + nonce + encrypt_key + body).encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
+    key = encrypt_key.encode("utf-8")
+    msg = (timestamp + nonce + body).encode("utf-8")
+    return hmac.new(key, msg, hashlib.sha256).hexdigest()
+
+
+def verify_signature_safe(
+    expected: str, timestamp: str, nonce: str, body: str, encrypt_key: str
+) -> bool:
+    """Verify a Feishu callback signature in constant time."""
+    computed = verify_signature(timestamp, nonce, body, encrypt_key)
+    return hmac.compare_digest(computed, expected)
 
 
 def handle_callback(
@@ -373,33 +382,33 @@ def handle_callback(
 
     message_id = event.get("open_message_id", "")
 
-    # Idempotency check
-    existing = conn.execute(
-        "SELECT processed FROM callbacks WHERE callback_id = ?",
-        (callback_id,),
-    ).fetchone()
-    if existing is not None and existing[0] == 1:
-        return {"code": 0}
-
-    # Parse pid:action
+    # Parse pid:action first (before DB ops)
     if ":" not in action_value:
         return {"code": 0}
 
     pid, action = action_value.split(":", 1)
 
-    # Insert callback row (processed=0)
+    # Atomic idempotency: INSERT OR IGNORE + check if row was actually inserted.
+    # If another worker already inserted the same callback_id, this is a no-op.
     conn.execute(
         "INSERT OR IGNORE INTO callbacks (callback_id, message_id, action) "
         "VALUES (?, ?, ?)",
         (callback_id, message_id, action),
     )
-    conn.commit()
+    # Check if this callback was already processed
+    row = conn.execute(
+        "SELECT processed FROM callbacks WHERE callback_id = ?",
+        (callback_id,),
+    ).fetchone()
+    if row and row[0] == 1:
+        conn.commit()
+        return {"code": 0}
 
     # Record the user interaction
     context = event.get("context", None)
     record_interaction(conn, pid, action, context=context)
 
-    # Mark processed
+    # Mark processed atomically
     conn.execute(
         "UPDATE callbacks SET processed = 1 WHERE callback_id = ?",
         (callback_id,),

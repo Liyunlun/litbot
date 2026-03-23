@@ -15,7 +15,7 @@ from typing import Any
 import httpx
 
 from .config import RetryPolicy
-from .observability import get_circuit, timed_op
+from .observability import get_circuit, log_op, timed_op
 
 logger = logging.getLogger(__name__)
 
@@ -552,13 +552,15 @@ async def enrich_papers(
         )
         if isinstance(oa_result, dict):
             oa_data = oa_result
-        else:
+        elif isinstance(oa_result, BaseException):
             logger.error("OpenAlex enrichment failed: %s", oa_result)
+            log_op(conn, "openalex", "enrich", "error", detail=str(oa_result))
 
         if isinstance(s2_result, dict):
             s2_data = s2_result
-        else:
+        elif isinstance(s2_result, BaseException):
             logger.error("S2 enrichment failed: %s", s2_result)
+            log_op(conn, "s2", "enrich", "error", detail=str(s2_result))
 
     # Merge enrichment data into papers
     for doi, indices in doi_papers.items():

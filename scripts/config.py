@@ -193,4 +193,4 @@ def save_profile(profile: Profile, path: Path | None = None) -> None:
     }
 
     with open(p, "w") as f:
-        yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        yaml.safe_dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)

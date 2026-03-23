@@ -88,7 +88,15 @@ def get_or_create_paper(
     if own_conn:
         conn = get_db()
 
+    # Whitelist of columns safe for dynamic UPDATE
+    _SAFE_COLUMNS = frozenset({
+        "doi", "arxiv_id", "s2_id", "openalex_id",
+        "abstract", "embedding", "concepts", "citation_count", "pdf_url",
+    })
+
     try:
+        # Use BEGIN IMMEDIATE to prevent concurrent duplicate inserts
+        conn.execute("BEGIN IMMEDIATE")
         row = None
 
         # Step 1-4: Exact ID match
@@ -160,12 +168,15 @@ def get_or_create_paper(
                 updates["pdf_url"] = pdf_url
 
             if updates:
-                set_clause = ", ".join(f"{k} = ?" for k in updates)
-                vals = list(updates.values())
-                conn.execute(
-                    f"UPDATE papers SET {set_clause}, updated_at = datetime('now') WHERE pid = ?",
-                    vals + [pid],
-                )
+                # Validate all column names against whitelist
+                updates = {k: v for k, v in updates.items() if k in _SAFE_COLUMNS}
+                if updates:
+                    set_clause = ", ".join(f"{k} = ?" for k in updates)
+                    vals = list(updates.values())
+                    conn.execute(
+                        f"UPDATE papers SET {set_clause}, updated_at = datetime('now') WHERE pid = ?",
+                        vals + [pid],
+                    )
                 conn.commit()
 
             return PaperRecord(
@@ -188,32 +199,43 @@ def get_or_create_paper(
 
         # Step 6: Create new paper
         if not title:
+            conn.rollback()
             raise ValueError("Cannot create paper without title")
 
         pid = f"p_{_nanoid()}"
-        conn.execute(
-            """INSERT INTO papers
-               (pid, doi, arxiv_id, s2_id, openalex_id, title, authors,
-                year, venue, abstract, embedding, concepts, citation_count, pdf_url)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                pid,
-                doi,
-                arxiv_id,
-                s2_id,
-                openalex_id,
-                title,
-                json.dumps(authors or []),
-                year,
-                venue,
-                abstract,
-                embedding,
-                json.dumps(concepts or []),
-                citation_count,
-                pdf_url,
-            ),
-        )
-        conn.commit()
+        try:
+            conn.execute(
+                """INSERT INTO papers
+                   (pid, doi, arxiv_id, s2_id, openalex_id, title, authors,
+                    year, venue, abstract, embedding, concepts, citation_count, pdf_url)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    pid,
+                    doi,
+                    arxiv_id,
+                    s2_id,
+                    openalex_id,
+                    title,
+                    json.dumps(authors or []),
+                    year,
+                    venue,
+                    abstract,
+                    embedding,
+                    json.dumps(concepts or []),
+                    citation_count,
+                    pdf_url,
+                ),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            # Race: another worker inserted the same paper — retry lookup
+            conn.rollback()
+            return get_or_create_paper(
+                conn=conn, doi=doi, arxiv_id=arxiv_id, s2_id=s2_id,
+                openalex_id=openalex_id, title=title, authors=authors,
+                year=year, venue=venue, abstract=abstract, embedding=embedding,
+                concepts=concepts, citation_count=citation_count, pdf_url=pdf_url,
+            )
 
         return PaperRecord(
             pid=pid,
