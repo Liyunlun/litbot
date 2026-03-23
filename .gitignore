@@ -1,0 +1,26 @@
+# Data
+data/litbot.db
+data/litbot.db-wal
+data/litbot.db-shm
+data/profile.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

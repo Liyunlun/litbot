@@ -1,0 +1,1 @@
+# LitBot scripts package

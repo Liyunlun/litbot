@@ -1,0 +1,69 @@
+# LitBot Profile Configuration
+# Copy this file to profile.yaml and customize it.
+# Run `python -m scripts.setup_profile` for an interactive setup wizard.
+
+# === Identity (all optional, improves matching quality) ===
+identity:
+  name: ""                                 # Display only, never sent to LLM
+  semantic_scholar_id: ""                  # Enables auto-pull of your papers
+  my_papers: []                            # DOI list for embedding warm-start
+  # my_papers:
+  #   - "10.1234/example.2025.001"
+  #   - "10.1234/example.2024.042"
+
+# === Research Areas (required, at least one) ===
+research_areas:
+  - "speech emotion recognition"
+  - "affective computing"
+  - "multimodal sentiment analysis"
+
+# === Active Projects (track competition & filter papers) ===
+active_projects:
+  - name: "SER with LLM"
+    keywords:
+      - "speech emotion"
+      - "large language model"
+      - "in-context learning"
+    venues:
+      - "INTERSPEECH"
+      - "ICASSP"
+      - "ACL"
+
+  - name: "Multimodal Emotion"
+    keywords:
+      - "multimodal"
+      - "emotion recognition"
+      - "cross-modal"
+    venues:
+      - "ACM MM"
+      - "AAAI"
+
+# === Venue Tiers (user-configurable) ===
+venue_tiers:
+  tier1:                                   # Always include, boost weight
+    - "Nature"
+    - "Science"
+    - "ICML"
+    - "NeurIPS"
+    - "ACL"
+    - "INTERSPEECH"
+  tier2: []                                # Include, neutral weight
+  blacklist:                               # Always exclude
+    - "MDPI journals"
+
+# === Preferences ===
+preferences:
+  min_citation_highlight: 10               # Highlight if cited >= N in past year
+  language: "zh"                           # Push language: zh | en
+  quiet_hours: [22, 8]                     # No push between 22:00-08:00
+  max_daily_papers: 10                     # Cap per daily digest
+  diversity_ratio: 0.2                     # 20% of slots for exploratory papers
+
+# === Retry Policy (for API calls) ===
+retry_policy:
+  max_attempts: 3
+  backoff: "exponential"                   # 1s -> 2s -> 4s
+  timeout_per_request: 10                  # seconds
+  circuit_breaker_threshold: 0.05          # 5% error rate triggers circuit break
+  circuit_breaker_window: 3600             # 1 hour window
+  circuit_breaker_cooldown: 3600           # 1 hour cooldown after trip
