@@ -99,7 +99,7 @@ async def fetch_crossref_new(
         f"&rows={rows}&sort=indexed&order=desc"
     )
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         with timed_op(conn, source, "fetch_new") as op:
             resp = await _request_with_retry(client, "GET", url, policy)
             data = resp.json()
@@ -188,12 +188,12 @@ async def fetch_arxiv_new(
     cats = categories or _DEFAULT_CATEGORIES
     cat_query = "+OR+".join(f"cat:{c}" for c in cats)
     url = (
-        f"http://export.arxiv.org/api/query"
+        f"https://export.arxiv.org/api/query"
         f"?search_query=submittedDate:[{date}+TO+{date}]+AND+({cat_query})"
         f"&max_results={max_results}"
     )
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         with timed_op(conn, source, "fetch_new") as op:
             resp = await _request_with_retry(client, "GET", url, policy)
             root = ET.fromstring(resp.text)
@@ -295,7 +295,7 @@ async def fetch_openalex_by_dois(
     # Batch in groups of 50
     batch_size = 50
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         for i in range(0, len(dois), batch_size):
             batch = dois[i : i + batch_size]
             doi_filter = "|".join(batch)
@@ -411,7 +411,7 @@ async def fetch_s2_by_ids(
     batch_size = 500
     url = f"https://api.semanticscholar.org/graph/v1/paper/batch?fields={_S2_FIELDS}"
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         for i in range(0, len(paper_ids), batch_size):
             batch = paper_ids[i : i + batch_size]
             # Prefix IDs with type for the batch endpoint
@@ -489,7 +489,7 @@ async def fetch_unpaywall(
 
     url = f"https://api.unpaywall.org/v2/{doi}?email={email}"
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         with timed_op(conn, source, "fetch_pdf_url") as op:
             try:
                 resp = await _request_with_retry(client, "GET", url, policy)

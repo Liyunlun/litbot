@@ -147,7 +147,14 @@ def compute_recency_score(
             pass
 
     if ref_date is None and year is not None:
-        ref_date = date(year, 1, 1)
+        # If the paper's year is the current year and no exact date is given,
+        # assume it's recent (use 7 days ago as a conservative estimate).
+        # Otherwise fall back to Jan 1 of that year.
+        current_year = date.today().year
+        if year >= current_year:
+            ref_date = date.today() - timedelta(days=7)
+        else:
+            ref_date = date(year, 1, 1)
 
     if ref_date is None:
         return 0.0
