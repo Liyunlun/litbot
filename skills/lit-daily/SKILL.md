@@ -10,8 +10,7 @@ Runs the F1 daily digest pipeline and F3 trend burst detection.
 
 ### Step 1: Fetch New Papers
 ```bash
-cd /home/user/lyl/Research/shared/litbot
-source venv/bin/activate
+cd litbot
 ```
 
 ```python

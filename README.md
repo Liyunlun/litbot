@@ -46,116 +46,106 @@ You ←→ Feishu Cards ←→ LitBot (Claude Code Bot)
 ### Method 1: Manual Setup
 
 ```bash
-# Clone
-git clone https://github.com/YourOrg/litbot.git
-cd litbot
+# Clone into your bot's working directory
+cd <bot_working_directory>
+git clone https://github.com/Liyunlun/litbot.git litbot
 
-# Python 3.10+ required
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+# Install dependencies (Python 3.10+)
+pip install -r litbot/requirements.txt
 
 # Initialize database
-python -m scripts.init_db
+cd litbot && python -m scripts.init_db && cd ..
+
+# Copy skills to .claude/skills/
+cp -r litbot/skills/* .claude/skills/
 
 # Configure profile (interactive wizard)
-python -m scripts.setup_profile
-
-# Set up Feishu (see docs/feishu-setup.md)
+cd litbot && python -m scripts.setup_profile && cd ..
 ```
 
 ### Method 2: One-Click Setup
 
 ```bash
-git clone https://github.com/YourOrg/litbot.git
-cd litbot
-bash setup.sh
+cd <bot_working_directory>
+git clone https://github.com/Liyunlun/litbot.git litbot
+cd litbot && bash setup.sh && cd ..
+cp -r litbot/skills/* .claude/skills/
 ```
 
 The script will:
 1. Check Python version (3.10+)
-2. Create virtual environment
-3. Install dependencies
-4. Initialize SQLite database
-5. Launch interactive profile configuration wizard
-6. Verify installation
+2. Install dependencies
+3. Initialize SQLite database
+4. Launch interactive profile configuration wizard
+5. Verify installation
 
-### Method 3: MetaBot Installation
+### Method 3: MetaBot Installation (install to an existing bot)
 
-Send this message to MetaBot in Feishu:
+Send this to MetaBot:
 
 ```
-Install LitBot from https://github.com/YourOrg/litbot.git
+Install LitBot to <bot_name> from https://github.com/Liyunlun/litbot.git
 ```
 
 MetaBot will:
-1. Clone the repo to `Research/shared/litbot/`
-2. Run `setup.sh` automatically
-3. Ask you profile configuration questions in chat
-4. Register LitBot as a bot with scheduled skills
-
-#### MetaBot Bot Registration
-
-After installation, MetaBot registers LitBot with these scheduled tasks:
-
-```
-# Daily digest at 8:00
-mb schedule add litbot <chat_id> "0 8 * * *" "/lit-daily"
-
-# Collision alert every hour
-mb schedule add litbot <chat_id> "0 * * * *" "/lit-alert"
-```
+1. Clone the repo into `<bot_dir>/litbot/`
+2. Copy skills to `<bot_dir>/.claude/skills/`
+3. Initialize database
+4. Ask profile configuration questions in chat
+5. Optionally register scheduled tasks
 
 #### For Bot Developers: Installation Instructions
 
-When MetaBot installs LitBot, it should follow these steps:
+When installing LitBot into an existing bot, follow these steps:
 
 ```bash
-# 1. Clone to shared directory
-cd ~/lyl/Research/shared
-git clone <repo_url> litbot
-cd litbot
+BOT_DIR=<bot_working_directory>
 
-# 2. Run one-click setup (non-interactive mode for dependencies)
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python -m scripts.init_db
+# 1. Copy litbot into the bot directory
+cd $BOT_DIR
+git clone https://github.com/Liyunlun/litbot.git litbot
 
-# 3. Profile setup — ask user these questions in chat:
+# 2. Install dependencies + initialize DB
+pip install -r litbot/requirements.txt
+cd litbot && python -m scripts.init_db && cd ..
+
+# 3. Copy skill definitions so the bot recognizes /lit-* commands
+cp -r litbot/skills/* .claude/skills/
+
+# 4. Profile setup — ask user these questions in chat:
 #    - Research areas (required): comma-separated list
 #    - Active project names + keywords (optional)
-#    - Tier 1 venues (optional)
-#    - Blacklisted venues (optional)
+#    - Tier 1/Tier 2 venues, blacklisted venues
 #    - Language preference: zh/en
 #    - Semantic Scholar ID (optional)
-#    Then write data/profile.yaml using scripts/config.py:
+#    Then write litbot/data/profile.yaml using scripts/config.py:
 #
-#    python -c "
+#    cd litbot && python -c "
 #    from scripts.config import Profile, ActiveProject, VenueTiers, Preferences, save_profile
 #    profile = Profile(
+#        name='User Name',
 #        research_areas=['area1', 'area2'],
 #        active_projects=[ActiveProject(name='...', keywords=['...'], venues=['...'])],
 #        venue_tiers=VenueTiers(tier1=['...'], blacklist=['...']),
 #        preferences=Preferences(language='zh'),
 #    )
 #    save_profile(profile)
-#    "
+#    " && cd ..
 
-# 4. Register scheduled tasks
-#    mb schedule add litbot <chat_id> "0 8 * * *" "/lit-daily"
-#    mb schedule add litbot <chat_id> "0 * * * *" "/lit-alert"
+# 5. (Optional) Register scheduled tasks via MetaBot
+#    mb schedule add <bot_name> <chat_id> "0 8 * * *" "/lit-daily"
+#    mb schedule add <bot_name> <chat_id> "0 * * * *" "/lit-alert"
 
-# 5. Verify
-python -c "
+# 6. Verify
+cd litbot && python -c "
 from scripts.init_db import get_db
 from scripts.config import load_profile
 conn = get_db()
 tables = conn.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()
 profile = load_profile()
-print(f'OK: {len(tables)} tables, {len(profile.research_areas)} areas')
+print(f'OK: {len(tables)} tables, {len(profile.research_areas)} areas, privacy={profile.privacy_level}')
 conn.close()
-"
+" && cd ..
 ```
 
 ---

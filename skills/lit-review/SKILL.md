@@ -11,8 +11,7 @@ Analyzes a paper's references, identifies gaps, and assesses novelty.
 ## Pipeline
 
 ```bash
-cd /home/user/lyl/Research/shared/litbot
-source venv/bin/activate
+cd litbot
 ```
 
 ### Step 1: Resolve Paper

@@ -9,8 +9,7 @@ Detects papers that compete with user's active research projects.
 ## Pipeline
 
 ```bash
-cd /home/user/lyl/Research/shared/litbot
-source venv/bin/activate
+cd litbot
 ```
 
 ### Step 1: Get Today's Papers with Embeddings
