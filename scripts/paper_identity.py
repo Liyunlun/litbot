@@ -177,7 +177,7 @@ def get_or_create_paper(
                         f"UPDATE papers SET {set_clause}, updated_at = datetime('now') WHERE pid = ?",
                         vals + [pid],
                     )
-                conn.commit()
+            conn.commit()
 
             return PaperRecord(
                 pid=pid,
