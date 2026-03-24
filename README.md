@@ -92,7 +92,7 @@ MetaBot will:
 2. Copy skills to `<bot_dir>/.claude/skills/`
 3. Initialize database
 4. Ask profile configuration questions in chat
-5. Optionally register scheduled tasks
+5. Register scheduled tasks (daily digest at 08:00, collision alert hourly)
 
 #### For Bot Developers: Installation Instructions
 
@@ -132,9 +132,9 @@ cp -r litbot/skills/* .claude/skills/
 #    save_profile(profile)
 #    " && cd ..
 
-# 5. (Optional) Register scheduled tasks via MetaBot
-#    mb schedule add <bot_name> <chat_id> "0 8 * * *" "/lit-daily"
-#    mb schedule add <bot_name> <chat_id> "0 * * * *" "/lit-alert"
+# 5. Register scheduled tasks via MetaBot
+#    mb schedule cron <bot_name> <chat_id> '0 8 * * *' '执行 /lit-daily'
+#    mb schedule cron <bot_name> <chat_id> '0 * * * *' '执行 /lit-alert'
 
 # 6. Verify
 cd litbot && python -c "
