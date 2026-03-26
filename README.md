@@ -233,7 +233,7 @@ LitBot is designed to work with [**MetaBot**](https://github.com/Shiien/metabot)
 
 - **Scheduled daily digests** — cron-based `/lit-daily` push at your configured time
 - **Chat-based interaction** — ask for papers, trigger alerts, manage profile via Feishu
-- **Multi-bot collaboration** — combine LitBot with [MetaScheduler](https://github.com/Liyunlun/MetaScheduler) for GPU-powered research workflows
+- **Multi-bot orchestration** — MetaBot manages bot lifecycle, scheduling, and cross-bot communication
 
 LitBot also works standalone with any Claude Code setup — MetaBot is recommended but not required.
 
