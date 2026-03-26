@@ -128,7 +128,7 @@ def _make_profile(**overrides):
         preferences=Preferences(
             min_citation_highlight=10,
             language="en",
-            quiet_hours=[22, 8],
+            digest_time="08:00",
             max_daily_papers=10,
             diversity_ratio=0.2,
         ),
@@ -871,7 +871,7 @@ class TestProfileLifecycle:
         assert loaded.preferences.max_daily_papers == profile.preferences.max_daily_papers
         assert loaded.preferences.diversity_ratio == profile.preferences.diversity_ratio
         assert loaded.preferences.language == profile.preferences.language
-        assert loaded.preferences.quiet_hours == profile.preferences.quiet_hours
+        assert loaded.preferences.digest_time == profile.preferences.digest_time
         assert loaded.retry_policy.max_attempts == profile.retry_policy.max_attempts
         assert loaded.retry_policy.backoff == profile.retry_policy.backoff
 

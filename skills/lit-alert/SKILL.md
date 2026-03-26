@@ -3,13 +3,15 @@
 Detects papers that compete with user's active research projects.
 
 ## Trigger
-- **Scheduled**: cron hourly
+- **Scheduled**: runs as part of `/lit-daily` digest pipeline
 - **Manual**: user sends `/lit-alert` or "碰撞检测"
 
 ## Pipeline
 
 ```bash
-cd litbot
+cd ${LITBOT_ROOT:-litbot}
+# Activate venv only if it exists (skipped in global-deps environments)
+[ -d venv ] && source venv/bin/activate
 ```
 
 ### Step 1: Get Today's Papers with Embeddings
@@ -56,8 +58,8 @@ for r in results:
     if is_already_pushed(conn, pid, "F2"):
         continue
 
-    if level == AlertLevel.HIGH:
-        # Immediate Feishu card
+    if level in (AlertLevel.HIGH, AlertLevel.MEDIUM):
+        # Include in daily digest collision section
         card = build_collision_card(
             paper=r["paper"],
             project_name=r["project"],
@@ -66,13 +68,8 @@ for r in results:
             analysis=r["analysis"],
             alert_level=level,
         )
-        # Push immediately via Feishu webhook
         record_push(conn, pid, "F2", message_id=msg_id)
-        log_op(conn, "litbot", "f2_alert_high", "ok", detail=f"{pid}: {r['collision_score']:.2f}")
-
-    elif level == AlertLevel.MEDIUM:
-        # Flag for daily digest (store in a staging area)
-        log_op(conn, "litbot", "f2_alert_medium", "ok", detail=f"{pid}: {r['collision_score']:.2f}")
+        log_op(conn, "litbot", f"f2_alert_{level.name.lower()}", "ok", detail=f"{pid}: {r['collision_score']:.2f}")
 
     elif level == AlertLevel.UNCERTAIN:
         # Push with "please confirm" label

@@ -34,24 +34,45 @@ fi
 echo "  ✅ Python version OK"
 echo
 
-# Step 2: Create virtual environment
-echo "── Step 2: Setting up virtual environment ──"
-if [ ! -d "venv" ]; then
-    $PYTHON -m venv venv
-    echo "  Created venv/"
-else
-    echo "  venv/ already exists, reusing"
+# Step 2: Environment detection
+echo "── Step 2: Checking environment ──"
+USE_VENV=true
+DEPS_OK=$($PYTHON -c "
+try:
+    import httpx, yaml, numpy
+    print('yes')
+except ImportError:
+    print('no')
+" 2>/dev/null)
+
+if [ "$DEPS_OK" = "yes" ]; then
+    echo "  Dependencies (httpx, pyyaml, numpy) already available globally."
+    read -p "  Skip venv and use existing environment? [Y/n]: " SKIP_VENV
+    if [[ ! "$SKIP_VENV" =~ ^[Nn] ]]; then
+        USE_VENV=false
+        echo "  ✅ Using existing environment (no venv)"
+    fi
 fi
 
-source venv/bin/activate
-echo "  ✅ Virtual environment activated"
-echo
+if [ "$USE_VENV" = true ]; then
+    echo "  Setting up virtual environment..."
+    if [ ! -d "venv" ]; then
+        $PYTHON -m venv venv
+        echo "  Created venv/"
+    else
+        echo "  venv/ already exists, reusing"
+    fi
+    source venv/bin/activate
+    echo "  ✅ Virtual environment activated"
+    echo
 
-# Step 3: Install dependencies
-echo "── Step 3: Installing dependencies ──"
-pip install -q --upgrade pip
-pip install -q -r requirements.txt
-echo "  ✅ Dependencies installed"
+    echo "── Step 3: Installing dependencies ──"
+    pip install -q --upgrade pip
+    pip install -q -r requirements.txt
+    echo "  ✅ Dependencies installed"
+else
+    echo "  Skipping venv creation and pip install."
+fi
 echo
 
 # Step 4: Initialize database
@@ -103,6 +124,8 @@ echo "  2. Set up Feishu bot (see docs/feishu-setup.md)"
 echo "  3. If using MetaBot: the bot will auto-discover skills"
 echo
 echo "  Quick test:"
-echo "    source venv/bin/activate"
+if [ "$USE_VENV" = true ]; then
+    echo "    source venv/bin/activate"
+fi
 echo "    python -c 'from scripts.config import load_profile; p = load_profile(); print(p.research_areas)'"
 echo

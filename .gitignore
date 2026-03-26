@@ -4,6 +4,10 @@ data/litbot.db-wal
 data/litbot.db-shm
 data/profile.yaml
 
+# Secrets
+.env
+.env.local
+
 # Python
 __pycache__/
 *.py[cod]

@@ -11,7 +11,9 @@ Analyzes a paper's references, identifies gaps, and assesses novelty.
 ## Pipeline
 
 ```bash
-cd litbot
+cd ${LITBOT_ROOT:-litbot}
+# Activate venv only if it exists (skipped in global-deps environments)
+[ -d venv ] && source venv/bin/activate
 ```
 
 ### Step 1: Resolve Paper

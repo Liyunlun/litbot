@@ -84,7 +84,7 @@ def run_setup(profile_path: Path | None = None) -> Profile:
     print()
 
     # === Step 1: Identity (optional) ===
-    print("── Step 1/6: Identity (optional, improves matching) ──")
+    print("── Step 1/7: Identity (optional, improves matching) ──")
     print()
     name = _input("Your name (for display only, not sent to LLM)", "")
     s2_id = _input("Semantic Scholar author ID (enables auto paper pull)", "")
@@ -101,20 +101,20 @@ def run_setup(profile_path: Path | None = None) -> Profile:
     print()
 
     # === Step 2: Research Areas (required) ===
-    print("── Step 2/6: Research Areas (required) ──")
+    print("── Step 2/7: Research Areas (required) ──")
     print()
     research_areas: list[str] = []
     while not research_areas:
         research_areas = _input_list(
             "Your research areas",
-            "e.g.: speech emotion recognition, affective computing"
+            "e.g.: machine learning, natural language processing"
         )
         if not research_areas:
             print("  ⚠ At least one research area is required.")
     print()
 
     # === Step 3: Active Projects ===
-    print("── Step 3/6: Active Projects ──")
+    print("── Step 3/7: Active Projects ──")
     print()
     projects: list[ActiveProject] = []
     if _yes_no("Do you have active research projects to track?", default=True):
@@ -123,8 +123,8 @@ def run_setup(profile_path: Path | None = None) -> Profile:
             proj_name = _input("    Project name", "")
             if not proj_name:
                 break
-            proj_keywords = _input_list("    Keywords", "e.g.: speech emotion, LLM, in-context learning")
-            proj_venues = _input_list("    Target venues", "e.g.: INTERSPEECH, ICASSP, ACL")
+            proj_keywords = _input_list("    Keywords", "e.g.: LLM reasoning, in-context learning")
+            proj_venues = _input_list("    Target venues", "e.g.: NeurIPS, ICML, ACL")
             projects.append(ActiveProject(
                 name=proj_name,
                 keywords=proj_keywords,
@@ -136,7 +136,7 @@ def run_setup(profile_path: Path | None = None) -> Profile:
     print()
 
     # === Step 4: Venue Tiers ===
-    print("── Step 4/6: Venue Tiers ──")
+    print("── Step 4/7: Venue Tiers ──")
     print()
     print("  Tier 1: top venues (always include, boost weight)")
     tier1 = _input_list("  Tier 1 venues", "e.g.: Nature, NeurIPS, ACL, ICML")
@@ -147,27 +147,73 @@ def run_setup(profile_path: Path | None = None) -> Profile:
     print()
 
     # === Step 5: Preferences ===
-    print("── Step 5/6: Preferences ──")
+    print("── Step 5/7: Preferences ──")
     print()
     language = _input("Push language", "zh")
+    digest_time = _input("Daily digest time (HH:MM)", "08:00")
     max_papers = _input_int("Max papers per daily digest", 10)
     diversity = _input_float("Diversity ratio (0-1, portion reserved for exploratory papers)", 0.2)
     min_cite = _input_int("Minimum citation count to highlight", 10)
     print()
 
-    quiet_start = _input_int("Quiet hours start (0-23)", 22)
-    quiet_end = _input_int("Quiet hours end (0-23)", 8)
+    # === Step 6: API Settings ===
+    print("── Step 6/7: API Settings ──")
+    print()
+    print("  Unpaywall API requires a contact email (their TOS).")
+    print("  You can use the default (litbot@example.com) or provide your own.")
+    unpaywall_email = _input("Unpaywall contact email", "litbot@example.com")
     print()
 
-    # === Step 6: Feishu Configuration ===
-    print("── Step 6/6: Feishu Configuration ──")
+    # === Step 7: Feishu Configuration ===
+    print("── Step 7/7: Feishu Configuration ──")
     print()
-    print("  You'll need a Feishu bot with:")
-    print("  - Bot webhook URL (for pushing cards)")
-    print("  - Event callback URL (for button interactions)")
+    print("  LitBot pushes paper cards via Feishu bot.")
+    print("  If you don't have a Feishu bot yet, create one at:")
+    print("    https://open.feishu.cn/app")
     print("  See docs/feishu-setup.md for detailed instructions.")
     print()
-    webhook = _input("Feishu webhook URL (or set LITBOT_FEISHU_WEBHOOK env var later)", "")
+    app_id = _input("Feishu App ID (e.g. cli_xxx, or press Enter to skip)", "")
+    app_secret = ""
+    chat_id = ""
+    if app_id:
+        app_secret = _input("Feishu App Secret", "")
+    if app_id and app_secret:
+        print()
+        print("  Now let's find the chat to push papers to.")
+        print("  1. Send a message to the bot in Feishu (any text is fine)")
+        print("  2. If using MetaBot, restart it first so the bot can receive messages")
+        print("  Then press Enter to auto-detect chats...")
+        input()
+        try:
+            from .feishu_auth import get_tenant_token, list_bot_chats
+            token = get_tenant_token(app_id, app_secret)
+            chats = list_bot_chats(token)
+            if not chats:
+                print("  ⚠ No chats found. Make sure you've messaged the bot first.")
+                chat_id = _input("Enter chat ID manually (oc_xxx)", "")
+            elif len(chats) == 1:
+                chat_id = chats[0]["chat_id"]
+                print(f"  Found 1 chat: {chats[0]['name']} ({chat_id})")
+                print(f"  ✅ Using this chat.")
+            else:
+                print(f"  Found {len(chats)} chats:")
+                for i, c in enumerate(chats):
+                    label = "P2P" if c["chat_type"] == "p2p" else "Group"
+                    print(f"    [{i + 1}] {c['name']} ({label}) — {c['chat_id']}")
+                while True:
+                    choice = _input(f"Select chat (1-{len(chats)})", "1")
+                    try:
+                        idx = int(choice) - 1
+                        if 0 <= idx < len(chats):
+                            chat_id = chats[idx]["chat_id"]
+                            break
+                    except ValueError:
+                        pass
+                    print("  ⚠ Invalid choice.")
+                print(f"  ✅ Selected: {chat_id}")
+        except Exception as e:
+            print(f"  ⚠ Auto-detect failed: {e}")
+            chat_id = _input("Enter chat ID manually (oc_xxx)", "")
     print()
 
     # === Build and save profile ===
@@ -181,9 +227,10 @@ def run_setup(profile_path: Path | None = None) -> Profile:
         preferences=Preferences(
             min_citation_highlight=min_cite,
             language=language,
-            quiet_hours=[quiet_start, quiet_end],
+            digest_time=digest_time,
             max_daily_papers=max_papers,
             diversity_ratio=diversity,
+            unpaywall_email=unpaywall_email,
         ),
         retry_policy=RetryPolicy(),
     )
@@ -199,18 +246,24 @@ def run_setup(profile_path: Path | None = None) -> Profile:
     print("=" * 50)
     print()
 
-    if webhook:
-        # Save webhook to env file (replace if already exists)
+    if app_id:
         env_path = path.parent / ".env"
-        existing_lines: list[str] = []
+        env_vars: dict[str, str] = {}
+        # Preserve existing env vars
         if env_path.exists():
-            existing_lines = [
-                line for line in env_path.read_text().splitlines()
-                if not line.startswith("LITBOT_FEISHU_WEBHOOK=")
-            ]
-        existing_lines.append(f"LITBOT_FEISHU_WEBHOOK={webhook}")
-        env_path.write_text("\n".join(existing_lines) + "\n")
-        print(f"  Webhook saved to {env_path}")
+            for line in env_path.read_text().splitlines():
+                if "=" in line and not line.startswith("#"):
+                    k, _, v = line.partition("=")
+                    env_vars[k.strip()] = v.strip()
+        env_vars["LITBOT_FEISHU_APP_ID"] = app_id
+        if app_secret:
+            env_vars["LITBOT_FEISHU_APP_SECRET"] = app_secret
+        if chat_id:
+            env_vars["LITBOT_FEISHU_CHAT_ID"] = chat_id
+        env_path.write_text(
+            "\n".join(f"{k}={v}" for k, v in env_vars.items()) + "\n"
+        )
+        print(f"  Feishu credentials saved to {env_path}")
 
     return profile
 

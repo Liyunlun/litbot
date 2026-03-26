@@ -13,30 +13,29 @@ identity:
 
 # === Research Areas (required, at least one) ===
 research_areas:
-  - "speech emotion recognition"
-  - "affective computing"
-  - "multimodal sentiment analysis"
+  - "machine learning"
+  - "natural language processing"
 
 # === Active Projects (track competition & filter papers) ===
 active_projects:
-  - name: "SER with LLM"
+  - name: "LLM Reasoning"
     keywords:
-      - "speech emotion"
+      - "chain-of-thought"
       - "large language model"
       - "in-context learning"
     venues:
-      - "INTERSPEECH"
-      - "ICASSP"
+      - "NeurIPS"
+      - "ICML"
       - "ACL"
 
-  - name: "Multimodal Emotion"
+  - name: "Tool-Augmented LLM"
     keywords:
-      - "multimodal"
-      - "emotion recognition"
-      - "cross-modal"
+      - "tool use"
+      - "code generation"
+      - "API calling"
     venues:
-      - "ACM MM"
-      - "AAAI"
+      - "ICLR"
+      - "EMNLP"
 
 # === Venue Tiers (user-configurable) ===
 venue_tiers:
@@ -46,7 +45,7 @@ venue_tiers:
     - "ICML"
     - "NeurIPS"
     - "ACL"
-    - "INTERSPEECH"
+    - "ICLR"
   tier2: []                                # Include, neutral weight
   blacklist:                               # Always exclude
     - "MDPI journals"
@@ -55,9 +54,10 @@ venue_tiers:
 preferences:
   min_citation_highlight: 10               # Highlight if cited >= N in past year
   language: "zh"                           # Push language: zh | en
-  quiet_hours: [22, 8]                     # No push between 22:00-08:00
+  digest_time: "08:00"                     # Daily digest push time (HH:MM)
   max_daily_papers: 10                     # Cap per daily digest
   diversity_ratio: 0.2                     # 20% of slots for exploratory papers
+  unpaywall_email: "litbot@example.com"   # Contact email for Unpaywall API (their TOS requires it)
 
 # === Retry Policy (for API calls) ===
 retry_policy:

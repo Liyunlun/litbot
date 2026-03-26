@@ -37,11 +37,11 @@ Crossref + arXiv → get_or_create_paper() → OpenAlex + S2 enrich
 → build_daily_digest_card() → Feishu push → record_push()
 ```
 
-### F2 Collision Alert (hourly)
+### F2 Collision Alert (daily, within F1 pipeline)
 ```
 Today's enriched papers → per-project coarse_filter(sim ≥ 0.65)
 → LLM 5-dimension scoring → classify_alert()
-→ HIGH: immediate card | MEDIUM: flag in digest | UNCERTAIN: "please confirm" | LOW: log only
+→ HIGH/MEDIUM: included in daily digest | UNCERTAIN: "please confirm" | LOW: log only
 ```
 
 ### F3 Trend Burst (daily, after F1)
@@ -118,9 +118,7 @@ Source priority for each field:
 
 ## Feishu Interaction
 
-- Daily digest: one new card at 8:00
-- HIGH collision: immediate new card
-- MEDIUM collision: merged into daily digest
+- Daily digest: one card at configurable time (default 08:00), includes F1 papers + F2 collisions + F3 trends
 - Button click: PATCH existing card in-place (never send new message)
 - All callbacks are idempotent (via callbacks table)
 - 3-second processing limit for callbacks
@@ -137,8 +135,8 @@ All API calls logged to `op_log` table via `timed_op()` context manager. Daily h
 
 | Skill | Function | Trigger |
 |-------|----------|---------|
-| `/lit-daily` | F1 daily digest + F3 trends | cron 8:00 |
-| `/lit-alert` | F2 collision detection | cron hourly |
+| `/lit-daily` | F1 daily digest + F2 collision + F3 trends | cron daily (configurable) |
+| `/lit-alert` | F2 collision detection (standalone) | manual or via /lit-daily |
 | `/lit-review` | F3β review assistance (beta) | manual |
 | `/lit-network` | F4 citation network | manual |
 | `/lit-compare` | F6 comparison table | manual |

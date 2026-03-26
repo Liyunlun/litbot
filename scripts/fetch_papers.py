@@ -49,7 +49,16 @@ async def _request_with_retry(
         except (httpx.HTTPStatusError, httpx.RequestError, httpx.TimeoutException) as exc:
             last_exc = exc
             if attempt < retry_policy.max_attempts - 1:
-                delay = 2 ** attempt  # 1s, 2s, 4s
+                # Use longer backoff for 429 Rate Limit responses
+                is_rate_limit = (
+                    isinstance(exc, httpx.HTTPStatusError)
+                    and exc.response.status_code == 429
+                )
+                if is_rate_limit:
+                    retry_after = exc.response.headers.get("Retry-After")
+                    delay = int(retry_after) if retry_after and retry_after.isdigit() else 30
+                else:
+                    delay = 2 ** attempt  # 1s, 2s, 4s
                 logger.warning(
                     "Retry %d/%d for %s %s: %s (backoff %.0fs)",
                     attempt + 1,
@@ -464,7 +473,7 @@ async def fetch_s2_by_ids(
 async def fetch_unpaywall(
     conn: sqlite3.Connection,
     doi: str,
-    email: str = "litbot@example.com",
+    email: str | None = None,
     *,
     retry_policy: RetryPolicy | None = None,
 ) -> str | None:
@@ -474,11 +483,16 @@ async def fetch_unpaywall(
         conn: SQLite connection for observability logging.
         doi: The DOI to look up.
         email: Contact email (required by Unpaywall API TOS).
+            Falls back to profile preferences or 'litbot@example.com'.
         retry_policy: Override default retry settings.
 
     Returns:
         URL string of the best OA PDF, or None if not available.
     """
+    if email is None:
+        from .config import load_profile
+        email = load_profile().preferences.unpaywall_email
+
     policy = retry_policy or RetryPolicy()
     source = "unpaywall"
     circuit = get_circuit(source, cooldown_sec=policy.circuit_breaker_cooldown)

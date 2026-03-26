@@ -27,9 +27,10 @@ class VenueTiers:
 class Preferences:
     min_citation_highlight: int = 10
     language: str = "zh"
-    quiet_hours: list[int] = field(default_factory=lambda: [22, 8])
+    digest_time: str = "08:00"
     max_daily_papers: int = 10
     diversity_ratio: float = 0.2
+    unpaywall_email: str = "litbot@example.com"
 
 
 @dataclass
@@ -122,9 +123,10 @@ def load_profile(path: Path | None = None) -> Profile:
         preferences=Preferences(
             min_citation_highlight=prefs_data.get("min_citation_highlight", 10),
             language=prefs_data.get("language", "zh"),
-            quiet_hours=prefs_data.get("quiet_hours", [22, 8]),
+            digest_time=prefs_data.get("digest_time", "08:00"),
             max_daily_papers=prefs_data.get("max_daily_papers", 10),
             diversity_ratio=prefs_data.get("diversity_ratio", 0.2),
+            unpaywall_email=prefs_data.get("unpaywall_email", "litbot@example.com"),
         ),
         retry_policy=RetryPolicy(
             max_attempts=retry_data.get("max_attempts", 3),
@@ -176,9 +178,10 @@ def save_profile(profile: Profile, path: Path | None = None) -> None:
     data["preferences"] = {
         "min_citation_highlight": profile.preferences.min_citation_highlight,
         "language": profile.preferences.language,
-        "quiet_hours": profile.preferences.quiet_hours,
+        "digest_time": profile.preferences.digest_time,
         "max_daily_papers": profile.preferences.max_daily_papers,
         "diversity_ratio": profile.preferences.diversity_ratio,
+        "unpaywall_email": profile.preferences.unpaywall_email,
     }
 
     # Retry policy

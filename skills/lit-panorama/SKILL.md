@@ -56,22 +56,22 @@ For each branch in the taxonomy:
 Mermaid graph:
 ```mermaid
 graph TD
-    ROOT["Topic: Speech Emotion Recognition"]
-    A["Acoustic Features"]
-    B["Multimodal Fusion"]
-    C["LLM-based SER"]
-    D["Cross-lingual SER"]
+    ROOT["Topic: LLM Reasoning"]
+    A["Chain-of-Thought"]
+    B["Tool Use"]
+    C["Self-Verification"]
+    D["Multi-Agent Debate"]
 
     ROOT --> A
     ROOT --> B
     ROOT --> C
     ROOT --> D
 
-    A --> A1["Wav2Vec2 features"]
-    A --> A2["Prosodic analysis"]
-    B --> B1["Audio-Visual"]
-    B --> B2["Audio-Text"]
-    C --> C1["In-context learning"]
+    A --> A1["Few-shot prompting"]
+    A --> A2["Zero-shot CoT"]
+    B --> B1["Code generation"]
+    B --> B2["API calling"]
+    C --> C1["Self-consistency"]
 
     style C fill:#ff9,stroke:#f00
     style C1 fill:#ff9,stroke:#f00

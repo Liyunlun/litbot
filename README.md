@@ -50,17 +50,21 @@ You ←→ Feishu Cards ←→ LitBot (Claude Code Bot)
 cd <bot_working_directory>
 git clone https://github.com/Liyunlun/litbot.git litbot
 
-# Install dependencies (Python 3.10+)
-pip install -r litbot/requirements.txt
+# Create virtual environment and install dependencies (Python 3.10+)
+cd litbot
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
 # Initialize database
-cd litbot && python -m scripts.init_db && cd ..
+python -m scripts.init_db
+
+# Configure profile (interactive wizard)
+python -m scripts.setup_profile
+cd ..
 
 # Copy skills to .claude/skills/
 cp -r litbot/skills/* .claude/skills/
-
-# Configure profile (interactive wizard)
-cd litbot && python -m scripts.setup_profile && cd ..
 ```
 
 ### Method 2: One-Click Setup
@@ -161,7 +165,7 @@ Key sections:
 - **research_areas** (required): your research topics
 - **active_projects**: projects to track for collision detection
 - **venue_tiers**: tier1 (boost), tier2 (neutral), blacklist (exclude)
-- **preferences**: language, max papers, diversity ratio, quiet hours
+- **preferences**: language, max papers, diversity ratio, quiet hours, Unpaywall email
 
 ### Privacy Levels
 
@@ -182,6 +186,7 @@ Privacy is auto-detected from which fields you fill in.
 litbot/
 ├── CLAUDE.md                  # Bot behavior instructions
 ├── README.md                  # This file
+├── LICENSE                    # MIT License
 ├── setup.sh                   # One-click setup
 ├── requirements.txt           # Python dependencies
 ├── scripts/
