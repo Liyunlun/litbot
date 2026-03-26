@@ -96,7 +96,7 @@ MetaBot will:
 2. Copy skills to `<bot_dir>/.claude/skills/`
 3. Initialize database
 4. Ask profile configuration questions in chat
-5. Register scheduled tasks (daily digest at 08:00, collision alert hourly)
+5. Register scheduled tasks (daily digest at configured time)
 
 #### For Bot Developers: Installation Instructions
 
@@ -138,7 +138,6 @@ cp -r litbot/skills/* .claude/skills/
 
 # 5. Register scheduled tasks via MetaBot
 #    mb schedule cron <bot_name> <chat_id> '0 8 * * *' '执行 /lit-daily'
-#    mb schedule cron <bot_name> <chat_id> '0 * * * *' '执行 /lit-alert'
 
 # 6. Verify
 cd litbot && python -c "
@@ -165,7 +164,7 @@ Key sections:
 - **research_areas** (required): your research topics
 - **active_projects**: projects to track for collision detection
 - **venue_tiers**: tier1 (boost), tier2 (neutral), blacklist (exclude)
-- **preferences**: language, max papers, diversity ratio, quiet hours, Unpaywall email
+- **preferences**: language, digest time, max papers, diversity ratio, Unpaywall email
 
 ### Privacy Levels
 
@@ -227,6 +226,16 @@ litbot/
 - **Bootstrap mode**: Cold-start handling with keyword seeds and explicit feedback buttons
 - **Circuit breakers**: API failures auto-degrade gracefully instead of crashing
 - **Diversity ratio**: 20% of daily slots reserved for exploratory papers to prevent filter bubbles
+
+## MetaBot Ecosystem
+
+LitBot is designed to work with [**MetaBot**](https://github.com/Shiien/metabot) — an AI agent bus that connects Claude Code bots via Feishu/Telegram. Using MetaBot you get:
+
+- **Scheduled daily digests** — cron-based `/lit-daily` push at your configured time
+- **Chat-based interaction** — ask for papers, trigger alerts, manage profile via Feishu
+- **Multi-bot collaboration** — combine LitBot with [MetaScheduler](https://github.com/Liyunlun/MetaScheduler) for GPU-powered research workflows
+
+LitBot also works standalone with any Claude Code setup — MetaBot is recommended but not required.
 
 ## License
 
