@@ -114,6 +114,84 @@ print(f'  Projects: {len(profile.active_projects)}')
 echo "  ✅ All checks passed"
 echo
 
+# Step 7: Schedule daily digest (cron)
+echo "── Step 7: Daily digest scheduling ──"
+
+# Read digest_time from profile.yaml
+DIGEST_TIME=$($PYTHON -c "
+from scripts.config import load_profile
+p = load_profile()
+print(p.preferences.digest_time)
+" 2>/dev/null || echo "08:00")
+DIGEST_HOUR="${DIGEST_TIME%%:*}"
+DIGEST_MIN="${DIGEST_TIME##*:}"
+# Strip leading zeros for cron
+DIGEST_HOUR=$((10#$DIGEST_HOUR))
+DIGEST_MIN=$((10#$DIGEST_MIN))
+
+if command -v mb &>/dev/null; then
+    # MetaBot environment — auto-register
+    echo "  MetaBot detected. Setting up scheduled daily digest."
+    echo
+
+    # Detect bot name from environment or ask
+    BOT_NAME="${METABOT_BOT_NAME:-}"
+    if [ -z "$BOT_NAME" ]; then
+        read -p "  Bot name running LitBot (e.g. reader): " BOT_NAME
+    fi
+
+    # Detect chat ID from profile .env or ask
+    CHAT_ID=""
+    if [ -f "data/.env" ]; then
+        CHAT_ID=$(grep '^LITBOT_FEISHU_CHAT_ID=' data/.env 2>/dev/null | cut -d= -f2)
+    fi
+    if [ -z "$CHAT_ID" ]; then
+        read -p "  Chat ID for daily digest (oc_xxx): " CHAT_ID
+    fi
+
+    if [ -n "$BOT_NAME" ] && [ -n "$CHAT_ID" ]; then
+        CRON_EXPR="$DIGEST_MIN $DIGEST_HOUR * * *"
+        CRON_PROMPT="执行 /lit-daily。使用 litbot/data/profile.yaml 配置，从 arXiv 和 Crossref 抓取最新论文，通过 paper_identity 去重，ranking 排序后，输出每日论文推荐（中文），包含标题、来源、分数和一句话推荐理由。"
+
+        echo "  Will register daily digest cron:"
+        echo "    Schedule : $CRON_EXPR (daily at $DIGEST_TIME)"
+        echo "    Bot      : $BOT_NAME"
+        echo "    Chat     : $CHAT_ID"
+        echo
+        read -p "  Register this cron job? [Y/n]: " CONFIRM_CRON
+        if [[ "$CONFIRM_CRON" =~ ^[Nn] ]]; then
+            echo "  Skipped. You can register manually later:"
+            echo "    mb schedule cron $BOT_NAME $CHAT_ID '$CRON_EXPR' '<prompt>'"
+        else
+
+        RESULT=$(mb schedule cron "$BOT_NAME" "$CHAT_ID" "$CRON_EXPR" "$CRON_PROMPT" 2>&1) || true
+        if echo "$RESULT" | grep -qi 'error\|fail'; then
+            echo "  ⚠ Cron registration failed: $RESULT"
+            echo "  You can set it up manually later:"
+            echo "    mb schedule cron $BOT_NAME $CHAT_ID '$CRON_EXPR' '<prompt>'"
+        else
+            echo "  ✅ Daily digest scheduled at $DIGEST_TIME"
+        fi
+
+        fi
+    else
+        echo "  ⚠ Missing bot name or chat ID. Skipping cron setup."
+        echo "  Set up manually:"
+        echo "    mb schedule cron <bot> <chatId> '$DIGEST_MIN $DIGEST_HOUR * * *' '<prompt>'"
+    fi
+else
+    # Non-MetaBot environment — show instructions
+    echo "  MetaBot not detected. To schedule daily digests, set up a cron job:"
+    echo
+    echo "  Option A — system crontab:"
+    echo "    crontab -e"
+    echo "    $DIGEST_MIN $DIGEST_HOUR * * * cd $SCRIPT_DIR && ${USE_VENV:+source venv/bin/activate && }python -m scripts.daily_pipeline"
+    echo
+    echo "  Option B — if you install MetaBot later:"
+    echo "    mb schedule cron <bot> <chatId> '$DIGEST_MIN $DIGEST_HOUR * * *' '/lit-daily'"
+fi
+echo
+
 echo "================================================"
 echo "  ✅ LitBot setup complete!"
 echo "================================================"
