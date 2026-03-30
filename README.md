@@ -92,11 +92,13 @@ Install LitBot to <bot_name> from https://github.com/Liyunlun/litbot.git
 ```
 
 MetaBot will:
-1. Clone the repo into `<bot_dir>/litbot/`
-2. Copy skills to `<bot_dir>/.claude/skills/`
-3. Initialize database
-4. Ask profile configuration questions in chat
-5. Register scheduled tasks (daily digest at configured time)
+1. Ask which bot to install to (or create a new one)
+2. Clone the repo and run `bash setup.sh --auto`
+3. Guide you through profile configuration in chat (research areas, projects, venues, preferences)
+4. Optionally configure Feishu push and auto-detect Chat ID
+5. Register scheduled daily digest with your confirmation
+
+> **For bot developers / AI agents**: see [`docs/metabot-install-guide.md`](docs/metabot-install-guide.md) for the complete step-by-step installation conversation flow. **Read this guide before installing LitBot for a user.**
 
 #### For Bot Developers: Installation Instructions
 
