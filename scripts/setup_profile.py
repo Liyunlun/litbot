@@ -268,5 +268,45 @@ def run_setup(profile_path: Path | None = None) -> Profile:
     return profile
 
 
+def run_from_yaml(source: str, target: Path | None = None) -> Profile:
+    """Load profile from a YAML file (non-interactive).
+
+    Args:
+        source: Path to a pre-filled YAML file.
+        target: Where to save (default: data/profile.yaml).
+    """
+    import yaml as _yaml
+
+    path = target or PROFILE_PATH
+    src = Path(source)
+    if not src.exists():
+        print(f"❌ Source file not found: {src}")
+        sys.exit(1)
+
+    with open(src) as f:
+        raw = _yaml.safe_load(f)
+
+    # Build profile from raw YAML (same structure as profile.example.yaml)
+    from .config import load_profile as _load, save_profile as _save
+
+    # Copy source to target, then load via the standard loader
+    path.parent.mkdir(parents=True, exist_ok=True)
+    import shutil
+    shutil.copy2(src, path)
+
+    profile = _load(path)
+    print(f"✅ Profile loaded from {src} → saved to {path}")
+    print(f"   Privacy level: {profile.privacy_level}")
+    print(f"   Research areas: {', '.join(profile.research_areas)}")
+    print(f"   Active projects: {len(profile.active_projects)}")
+    return profile
+
+
 if __name__ == "__main__":
-    run_setup()
+    if len(sys.argv) > 1 and sys.argv[1] == "--from-yaml":
+        if len(sys.argv) < 3:
+            print("Usage: python -m scripts.setup_profile --from-yaml <path>")
+            sys.exit(1)
+        run_from_yaml(sys.argv[2])
+    else:
+        run_setup()
