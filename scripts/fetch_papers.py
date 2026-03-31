@@ -563,7 +563,7 @@ async def fetch_openalex_by_keywords(
 
 _S2_FIELDS = (
     "paperId,externalIds,title,abstract,"
-    "embedding.vector,tldr,citationCount,venue,year"
+    "embedding.specter_v2,tldr,citationCount,venue,year"
 )
 
 
