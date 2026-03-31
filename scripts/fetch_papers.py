@@ -81,6 +81,7 @@ async def fetch_crossref_new(
     from_date: str,
     rows: int = 100,
     *,
+    query_keywords: list[str] | None = None,
     retry_policy: RetryPolicy | None = None,
 ) -> list[dict[str, Any]]:
     """Fetch recently indexed works from Crossref.
@@ -89,6 +90,9 @@ async def fetch_crossref_new(
         conn: SQLite connection for observability logging.
         from_date: ISO date string (YYYY-MM-DD) for the index-date filter.
         rows: Maximum number of results to return.
+        query_keywords: Profile keywords to pre-filter results. When provided,
+            Crossref ``query`` parameter narrows results to relevant papers
+            instead of returning globally random recent papers.
         retry_policy: Override default retry settings.
 
     Returns:
@@ -102,11 +106,18 @@ async def fetch_crossref_new(
         logger.warning("Circuit open for %s — skipping", source)
         return []
 
+    # Build query with keyword pre-filtering.
+    # Without keywords, Crossref returns globally random recent papers which
+    # is useless for niche fields (100 random papers won't contain any match).
     url = (
         f"https://api.crossref.org/works"
         f"?filter=from-index-date:{from_date}"
-        f"&rows={rows}&sort=indexed&order=desc"
+        f"&rows={rows}&sort=relevance&order=desc"
     )
+    if query_keywords:
+        # Use top 5 keywords to keep the query focused
+        query_terms = "+".join(query_keywords[:5])
+        url += f"&query={query_terms}"
 
     async with httpx.AsyncClient(follow_redirects=True) as client:
         with timed_op(conn, source, "fetch_new") as op:
@@ -165,6 +176,38 @@ _ARXIV_NS = {
 
 _DEFAULT_CATEGORIES = ["cs.CL", "cs.AI", "cs.LG", "cs.SD", "eess.AS"]
 
+# Mapping from common research area keywords to arXiv categories.
+# Used when profile doesn't specify explicit arXiv categories.
+_AREA_TO_ARXIV: dict[str, list[str]] = {
+    "psychology": ["q-bio.NC", "cs.CY", "cs.HC"],
+    "social": ["cs.SI", "cs.CY", "physics.soc-ph"],
+    "neuroscience": ["q-bio.NC", "cs.NE"],
+    "biology": ["q-bio.GN", "q-bio.MN", "q-bio.PE"],
+    "physics": ["physics.gen-ph", "cond-mat", "hep-ph"],
+    "math": ["math.CO", "math.OC", "math.ST"],
+    "economics": ["econ.GN", "econ.TH"],
+    "statistics": ["stat.ML", "stat.ME", "stat.AP"],
+    "medical": ["q-bio.QM", "cs.CE"],
+    "robotics": ["cs.RO", "cs.SY"],
+    "nlp": ["cs.CL"],
+    "vision": ["cs.CV"],
+    "machine learning": ["cs.LG", "stat.ML"],
+    "agent": ["cs.AI", "cs.MA"],
+}
+
+
+def _infer_arxiv_categories(research_areas: list[str]) -> list[str]:
+    """Infer arXiv categories from profile research areas."""
+    cats: list[str] = []
+    for area in research_areas:
+        area_lower = area.lower()
+        for keyword, arxiv_cats in _AREA_TO_ARXIV.items():
+            if keyword in area_lower:
+                for c in arxiv_cats:
+                    if c not in cats:
+                        cats.append(c)
+    return cats if cats else _DEFAULT_CATEGORIES
+
 
 async def fetch_arxiv_new(
     conn: sqlite3.Connection,
@@ -172,6 +215,7 @@ async def fetch_arxiv_new(
     categories: list[str] | None = None,
     max_results: int = 200,
     *,
+    query_keywords: list[str] | None = None,
     retry_policy: RetryPolicy | None = None,
 ) -> list[dict[str, Any]]:
     """Fetch papers submitted on a given date from arXiv.
@@ -181,6 +225,9 @@ async def fetch_arxiv_new(
         date: Date string in YYYYMMDD format for the submittedDate range.
         categories: arXiv category codes to filter. Defaults to CS/audio categories.
         max_results: Maximum entries to retrieve.
+        query_keywords: Profile keywords used to infer categories when none
+            are explicitly provided. Also adds keyword terms to the query
+            for better relevance.
         retry_policy: Override default retry settings.
 
     Returns:
@@ -194,11 +241,24 @@ async def fetch_arxiv_new(
         logger.warning("Circuit open for %s — skipping", source)
         return []
 
-    cats = categories or _DEFAULT_CATEGORIES
+    # Infer categories from profile keywords if not explicitly provided
+    if categories:
+        cats = categories
+    elif query_keywords:
+        cats = _infer_arxiv_categories(query_keywords)
+    else:
+        cats = _DEFAULT_CATEGORIES
+
     cat_query = "+OR+".join(f"cat:{c}" for c in cats)
+    # Add keyword terms to improve relevance within matched categories
+    if query_keywords and not categories:
+        kw_query = "+OR+".join(f"all:{kw}" for kw in query_keywords[:3])
+        search_query = f"submittedDate:[{date}+TO+{date}]+AND+(({cat_query})+OR+({kw_query}))"
+    else:
+        search_query = f"submittedDate:[{date}+TO+{date}]+AND+({cat_query})"
     url = (
         f"https://export.arxiv.org/api/query"
-        f"?search_query=submittedDate:[{date}+TO+{date}]+AND+({cat_query})"
+        f"?search_query={search_query}"
         f"&max_results={max_results}"
     )
 
@@ -374,6 +434,127 @@ async def fetch_openalex_by_dois(
                 op["detail"] = f"batch {i // batch_size + 1}: {len(batch)} dois"
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# 3b. OpenAlex keyword search (additional source for niche fields)
+# ---------------------------------------------------------------------------
+
+
+async def fetch_openalex_by_keywords(
+    conn: sqlite3.Connection,
+    keywords: list[str],
+    from_date: str,
+    rows: int = 50,
+    *,
+    retry_policy: RetryPolicy | None = None,
+) -> list[dict[str, Any]]:
+    """Fetch recent papers from OpenAlex matching profile keywords.
+
+    This supplements Crossref for niche fields where Crossref's 100 random
+    papers are unlikely to contain relevant results. OpenAlex supports
+    concept-based and keyword search with date filtering.
+
+    Args:
+        conn: SQLite connection for observability logging.
+        keywords: Profile keywords to search for.
+        from_date: ISO date string (YYYY-MM-DD) for the date filter.
+        rows: Maximum number of results.
+        retry_policy: Override default retry settings.
+
+    Returns:
+        List of dicts with keys: doi, title, authors, year, venue, abstract,
+        openalex_id, concepts, cited_by_count.
+    """
+    policy = retry_policy or RetryPolicy()
+    source = "openalex"
+    circuit = get_circuit(source, cooldown_sec=policy.circuit_breaker_cooldown)
+
+    if circuit.is_open:
+        logger.warning("Circuit open for %s — skipping keyword search", source)
+        return []
+
+    if not keywords:
+        return []
+
+    # Build search query: use top keywords joined by OR
+    search_terms = "|".join(keywords[:5])
+    url = (
+        f"https://api.openalex.org/works"
+        f"?filter=from_publication_date:{from_date},"
+        f"default.search:{search_terms}"
+        f"&per_page={rows}&sort=relevance_score:desc"
+    )
+
+    papers: list[dict[str, Any]] = []
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        with timed_op(conn, source, "fetch_by_keywords") as op:
+            try:
+                resp = await _request_with_retry(client, "GET", url, policy)
+                data = resp.json()
+            except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+                logger.warning("OpenAlex keyword search failed: %s", exc)
+                op["detail"] = f"keyword search failed: {exc}"
+                return []
+
+            for work in data.get("results", []):
+                work_doi = work.get("doi", "") or ""
+                if work_doi.startswith("https://doi.org/"):
+                    work_doi = work_doi[len("https://doi.org/"):]
+
+                if not work_doi:
+                    continue  # skip papers without DOI
+
+                oa_id_url = work.get("id", "")
+                openalex_id = (
+                    oa_id_url.rsplit("/", 1)[-1]
+                    if "/" in oa_id_url
+                    else oa_id_url
+                )
+
+                abstract = _reconstruct_abstract(
+                    work.get("abstract_inverted_index")
+                )
+
+                concepts = [
+                    c.get("display_name", "")
+                    for c in work.get("concepts", [])
+                    if c.get("display_name")
+                ]
+
+                # Authors
+                authors: list[str] = []
+                for authorship in work.get("authorships", []):
+                    author_info = authorship.get("author", {})
+                    name = author_info.get("display_name", "")
+                    if name:
+                        authors.append(name)
+
+                year = work.get("publication_year")
+
+                venue: str | None = None
+                primary_loc = work.get("primary_location") or {}
+                source_info = primary_loc.get("source") or {}
+                venue = source_info.get("display_name")
+
+                title = work.get("title", "")
+
+                papers.append({
+                    "doi": work_doi,
+                    "title": title,
+                    "authors": authors,
+                    "year": year,
+                    "venue": venue,
+                    "abstract": abstract,
+                    "openalex_id": openalex_id,
+                    "concepts": concepts,
+                    "cited_by_count": work.get("cited_by_count", 0),
+                })
+
+            op["detail"] = f"keyword search: {len(papers)} papers"
+
+    return papers
 
 
 # ---------------------------------------------------------------------------
@@ -576,7 +757,15 @@ async def enrich_papers(
             logger.error("S2 enrichment failed: %s", s2_result)
             log_op(conn, "s2", "enrich", "error", detail=str(s2_result))
 
-    # Merge enrichment data into papers
+    # Merge enrichment data into papers.
+    # Use _merge_field() instead of setdefault() to handle None values correctly:
+    # setdefault("abstract", None) sets the key to None, then a later source with
+    # a real value can't overwrite it. This caused abstract fallback to silently fail.
+    def _merge_field(target: dict, key: str, value: Any) -> None:
+        """Set field only if current value is missing or None."""
+        if value is not None and not target.get(key):
+            target[key] = value
+
     for doi, indices in doi_papers.items():
         oa = oa_data.get(doi, {})
         s2 = s2_data.get(doi, {})
@@ -586,10 +775,10 @@ async def enrich_papers(
 
             # OpenAlex fields
             if oa:
-                paper.setdefault("openalex_id", oa.get("openalex_id"))
-                paper.setdefault("abstract", oa.get("abstract"))
-                paper.setdefault("concepts", oa.get("concepts", []))
-                paper.setdefault("cited_by_count", oa.get("cited_by_count", 0))
+                _merge_field(paper, "openalex_id", oa.get("openalex_id"))
+                _merge_field(paper, "abstract", oa.get("abstract"))
+                _merge_field(paper, "concepts", oa.get("concepts"))
+                _merge_field(paper, "cited_by_count", oa.get("cited_by_count"))
                 if oa.get("venue") and not paper.get("venue"):
                     paper["venue"] = oa["venue"]
                 if oa.get("arxiv_id") and not paper.get("arxiv_id"):
@@ -597,12 +786,12 @@ async def enrich_papers(
 
             # Semantic Scholar fields
             if s2:
-                paper.setdefault("s2_id", s2.get("s2_id"))
-                paper.setdefault("abstract", s2.get("abstract"))
-                paper.setdefault("embedding", s2.get("embedding"))
-                paper.setdefault("tldr", s2.get("tldr"))
-                paper.setdefault("citation_count", s2.get("citation_count", 0))
-                paper.setdefault("external_ids", s2.get("external_ids", {}))
+                _merge_field(paper, "s2_id", s2.get("s2_id"))
+                _merge_field(paper, "abstract", s2.get("abstract"))
+                _merge_field(paper, "embedding", s2.get("embedding"))
+                _merge_field(paper, "tldr", s2.get("tldr"))
+                _merge_field(paper, "citation_count", s2.get("citation_count"))
+                _merge_field(paper, "external_ids", s2.get("external_ids"))
                 if s2.get("venue") and not paper.get("venue"):
                     paper["venue"] = s2["venue"]
 

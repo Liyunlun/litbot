@@ -16,11 +16,14 @@ varies by privacy level.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import random
 import re
 import sqlite3
 from datetime import date, datetime, timedelta
+
+logger = logging.getLogger(__name__)
 
 import numpy as np
 
@@ -352,12 +355,28 @@ def rank_papers(
        for papers ranked 15-50 (random sample from that band).
     6. Return the top ``max_daily_papers`` as (paper, score) pairs.
     """
-    weights = profile.ranking_weights
+    weights = dict(profile.ranking_weights)  # copy so we can modify
     venue_tiers = profile.venue_tiers
     keywords = collect_keywords(profile)
     centroid = get_profile_centroid(conn)
     max_papers = profile.preferences.max_daily_papers
     diversity_ratio = profile.preferences.diversity_ratio
+
+    # --- Step 0: redistribute weights when embedding unavailable ---
+    # When S2 is down or no centroid exists, sim weight is dead weight.
+    # Redistribute it proportionally to keyword and venue to maintain
+    # discriminative power instead of silently losing 40% of signal.
+    if centroid is None and weights.get("sim", 0) > 0:
+        lost = weights["sim"]
+        weights["sim"] = 0.0
+        remaining = weights.get("keyword", 0) + weights.get("venue", 0) + weights.get("recency", 0)
+        if remaining > 0:
+            for k in ("keyword", "venue", "recency"):
+                weights[k] = weights.get(k, 0) + lost * (weights.get(k, 0) / remaining)
+        logger.info(
+            "No embedding centroid — redistributed sim weight: kw=%.2f venue=%.2f rec=%.2f",
+            weights.get("keyword", 0), weights.get("venue", 0), weights.get("recency", 0),
+        )
 
     # --- Step 1: filter blacklisted venues ---
     candidates: list[PaperRecord] = []
